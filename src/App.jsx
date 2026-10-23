@@ -5,6 +5,18 @@ import './App.css';
 function App() {
   const [started, setStarted] = useState(false);
 
+  async function handleStartExam() {
+    try {
+      const result = await window.desktopAPI.showRulesDialog();
+
+      if (result === 0) {
+        setStarted(true);
+      }
+    } catch (error) {
+      console.error('Could not open examination rules:', error);
+    }
+  }
+
   return (
     <main className="exam-app">
       <header className="exam-header">
@@ -17,10 +29,12 @@ function App() {
 
       <section className="exam-card">
         <p className="eyebrow">IN-CLASS ASSESSMENT</p>
+
         <h2>{started ? 'Exam Session' : 'Ready to begin?'}</h2>
+
         <p className="description">
           {started
-            ? 'Your exam interface is now active.'
+            ? 'You confirmed the rules. Your exam session is now active.'
             : 'Review your setup before entering the examination.'}
         </p>
 
@@ -29,10 +43,12 @@ function App() {
             <span>Assessment</span>
             <strong>MCQ Examination</strong>
           </div>
+
           <div>
             <span>Mode</span>
             <strong>Desktop Application</strong>
           </div>
+
           <div>
             <span>Session</span>
             <strong>{started ? 'In progress' : 'Not started'}</strong>
@@ -41,7 +57,7 @@ function App() {
 
         <button
           className="start-button"
-          onClick={() => setStarted(true)}
+          onClick={handleStartExam}
           disabled={started}
         >
           {started ? 'Session Started ✓' : 'Start Exam →'}
