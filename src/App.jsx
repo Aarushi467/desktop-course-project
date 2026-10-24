@@ -1,5 +1,4 @@
 
-
 import { useState } from 'react';
 import './App.css';
 
@@ -11,54 +10,48 @@ function App() {
   const [submitted, setSubmitted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [result, setResult] = useState(null);
 
   async function loadQuestions() {
     setLoading(true);
     setError('');
 
     try {
-      const response = await fetch('http://localhost:3000/exam/mcq/1');
-
-      if (!response.ok) {
-        throw new Error('Could not load the exam question.');
-      }
-
-      const firstQuestion = await response.json();
-
-      // Load all three questions from the Express API.
-      const remainingResponses = await Promise.all([
+      const responses = await Promise.all([
+        fetch('http://localhost:3000/exam/mcq/1'),
         fetch('http://localhost:3000/exam/mcq/2'),
         fetch('http://localhost:3000/exam/mcq/3'),
       ]);
 
-      if (remainingResponses.some((item) => !item.ok)) {
-        throw new Error('Could not load all exam questions.');
+      if (responses.some((response) => !response.ok)) {
+        throw new Error('Failed to load questions.');
       }
 
-      const remainingQuestions = await Promise.all(
-        remainingResponses.map((item) => item.json())
+      const loadedQuestions = await Promise.all(
+        responses.map((response) => response.json())
       );
 
-      setQuestions([firstQuestion, ...remainingQuestions]);
+      setQuestions(loadedQuestions);
       setCurrentQuestion(0);
       setAnswers({});
+      setResult(null);
       setSubmitted(false);
       setStarted(true);
     } catch (err) {
       console.error('Question loading failed:', err);
-      setError(
-        'Unable to load questions. Check that the Express server is running on port 3000.'
-      );
+      setError('Unable to load questions. Check that the Express server is running on port 3000.');
     } finally {
       setLoading(false);
     }
   }
 
   async function handleStartExam() {
-    try {
-      const result = await window.desktopAPI.showRulesDialog();
+    setError('');
 
-      if (result === 0) {
+    try {
+      const response = await window.desktopAPI.showRulesDialog();
+
+      if (response === 0) {
         await loadQuestions();
       }
     } catch (err) {
@@ -68,14 +61,39 @@ function App() {
   }
 
   function selectAnswer(optionIndex) {
-    setAnswers((previousAnswers) => ({
-      ...previousAnswers,
+    setAnswers((previous) => ({
+      ...previous,
       [currentQuestion]: optionIndex,
     }));
   }
 
-  function finishExam() {
-    setSubmitted(true);
+  async function finishExam() {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:3000/exam/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ answers }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Could not score the exam.');
+      }
+
+      setResult(data);
+      setSubmitted(true);
+    } catch (err) {
+      console.error('Exam submission failed:', err);
+      setError('Unable to submit answers. Check that the Express server is running.');
+    } finally {
+      setLoading(false);
+    }
   }
 
   function returnToPortal() {
@@ -83,12 +101,11 @@ function App() {
     setCurrentQuestion(0);
     setAnswers({});
     setSubmitted(false);
+    setResult(null);
     setError('');
   }
 
-  const question = questions[currentQuestion];
-
-  if (submitted) {
+  if (submitted && result) {
     return (
       <main className="exam-app">
         <header className="exam-header">
@@ -102,13 +119,21 @@ function App() {
         <section className="exam-card">
           <p className="eyebrow">ASSESSMENT COMPLETE</p>
           <h2>Your exam is submitted!</h2>
-          <p className="description">
-            You selected answers for {Object.keys(answers).length} of{' '}
-            {questions.length} questions.
-          </p>
-          <p className="description">
-            Your answers have not been scored yet.
-          </p>
+
+          <div className="exam-details">
+            <div>
+              <span>Score</span>
+              <strong>{result.score} / {result.total}</strong>
+            </div>
+            <div>
+              <span>Percentage</span>
+              <strong>{result.percentage}%</strong>
+            </div>
+            <div>
+              <span>Answered</span>
+              <strong>{Object.keys(answers).length} / {questions.length}</strong>
+            </div>
+          </div>
 
           <button className="start-button" onClick={returnToPortal}>
             Return to Portal
@@ -120,7 +145,9 @@ function App() {
     );
   }
 
-  if (started && question) {
+  if (started && questions.length > 0) {
+    const question = questions[currentQuestion];
+
     return (
       <main className="exam-app">
         <header className="exam-header">
@@ -165,10 +192,8 @@ function App() {
           <div className="question-navigation">
             <button
               className="secondary-button"
-              disabled={currentQuestion === 0}
-              onClick={() =>
-                setCurrentQuestion((previous) => previous - 1)
-              }
+              disabled={currentQuestion === 0 || loading}
+              onClick={() => setCurrentQuestion((previous) => previous - 1)}
             >
               ← Previous
             </button>
@@ -176,22 +201,26 @@ function App() {
             {currentQuestion < questions.length - 1 ? (
               <button
                 className="start-button"
-                onClick={() =>
-                  setCurrentQuestion((previous) => previous + 1)
-                }
+                onClick={() => setCurrentQuestion((previous) => previous + 1)}
+                disabled={loading}
               >
                 Next Question →
               </button>
             ) : (
-              <button className="start-button" onClick={finishExam}>
-                Submit Exam ✓
+              <button
+                className="start-button"
+                onClick={finishExam}
+                disabled={loading}
+              >
+                {loading ? 'Submitting...' : 'Submit Exam ✓'}
               </button>
             )}
           </div>
 
+          {error && <p className="description">{error}</p>}
+
           <p className="description">
-            {Object.keys(answers).length} of {questions.length} questions
-            answered
+            {Object.keys(answers).length} of {questions.length} questions answered
           </p>
         </section>
 
@@ -239,8 +268,9 @@ function App() {
           onClick={handleStartExam}
           disabled={loading}
         >
-          {loading ? 'Loading Questions...' : 'Start Exam →'}
+          {loading ? 'Loading...' : 'Start Exam →'}
         </button>
+
       </section>
 
       <footer>ATHENA · Desktop Examination System</footer>
