@@ -13,18 +13,16 @@ function createWindow() {
     },
   });
 
-  win.loadURL('http://localhost:5173');
+  win.loadURL('http://localhost:5174');
 }
 
 ipcMain.handle('show-rules', async () => {
   const result = await dialog.showMessageBox({
     type: 'info',
-    title: 'Examination Rules',
-    message: 'Before you begin',
-    detail:
-      'Ensure you are ready to take the examination. Starting the test will begin your exam session.',
+    title: 'Exam Rules',
+    message: 'Please read the exam rules carefully.',
+    detail: 'Stay on the exam screen. Keep the camera enabled. Do not use external assistance.',
     buttons: ['Start Test', 'Cancel'],
-    defaultId: 0,
     cancelId: 1,
   });
 
