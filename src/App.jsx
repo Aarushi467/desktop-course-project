@@ -3,52 +3,67 @@
 import { useState } from 'react';
 import './App.css';
 
-const questions = [
-  {
-    id: 1,
-    question: 'Which part of Electron manages the application lifecycle and native operating system APIs?',
-    options: [
-      'React component',
-      'Main process',
-      'CSS stylesheet',
-      'HTML document',
-    ],
-    correctAnswer: 1,
-  },
-  {
-    id: 2,
-    question: 'Which technology is used to build the user interface in this project?',
-    options: ['React', 'SQLite', 'Git', 'npm'],
-    correctAnswer: 0,
-  },
-  {
-    id: 3,
-    question: 'What is the purpose of a preload script in Electron?',
-    options: [
-      'To style buttons',
-      'To replace React',
-      'To expose selected APIs safely between processes',
-      'To install npm packages',
-    ],
-    correctAnswer: 2,
-  },
-];
-
 function App() {
   const [started, setStarted] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  async function loadQuestions() {
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('http://localhost:3000/exam/mcq/1');
+
+      if (!response.ok) {
+        throw new Error('Could not load the exam question.');
+      }
+
+      const firstQuestion = await response.json();
+
+      // Load all three questions from the Express API.
+      const remainingResponses = await Promise.all([
+        fetch('http://localhost:3000/exam/mcq/2'),
+        fetch('http://localhost:3000/exam/mcq/3'),
+      ]);
+
+      if (remainingResponses.some((item) => !item.ok)) {
+        throw new Error('Could not load all exam questions.');
+      }
+
+      const remainingQuestions = await Promise.all(
+        remainingResponses.map((item) => item.json())
+      );
+
+      setQuestions([firstQuestion, ...remainingQuestions]);
+      setCurrentQuestion(0);
+      setAnswers({});
+      setSubmitted(false);
+      setStarted(true);
+    } catch (err) {
+      console.error('Question loading failed:', err);
+      setError(
+        'Unable to load questions. Check that the Express server is running on port 3000.'
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
 
   async function handleStartExam() {
     try {
       const result = await window.desktopAPI.showRulesDialog();
 
       if (result === 0) {
-        setStarted(true);
+        await loadQuestions();
       }
-    } catch (error) {
-      console.error('Could not open examination rules:', error);
+    } catch (err) {
+      console.error('Could not open examination rules:', err);
+      setError('Could not open the examination rules dialog.');
     }
   }
 
@@ -63,11 +78,15 @@ function App() {
     setSubmitted(true);
   }
 
-  const question = questions[currentQuestion];
+  function returnToPortal() {
+    setStarted(false);
+    setCurrentQuestion(0);
+    setAnswers({});
+    setSubmitted(false);
+    setError('');
+  }
 
-  const score = questions.reduce((total, item, index) => {
-    return total + (answers[index] === item.correctAnswer ? 1 : 0);
-  }, 0);
+  const question = questions[currentQuestion];
 
   if (submitted) {
     return (
@@ -84,29 +103,14 @@ function App() {
           <p className="eyebrow">ASSESSMENT COMPLETE</p>
           <h2>Your exam is submitted!</h2>
           <p className="description">
-            You answered {Object.keys(answers).length} of {questions.length} questions.
+            You selected answers for {Object.keys(answers).length} of{' '}
+            {questions.length} questions.
+          </p>
+          <p className="description">
+            Your answers have not been scored yet.
           </p>
 
-          <div className="exam-details">
-            <div>
-              <span>Score</span>
-              <strong>{score} / {questions.length}</strong>
-            </div>
-            <div>
-              <span>Percentage</span>
-              <strong>{Math.round((score / questions.length) * 100)}%</strong>
-            </div>
-          </div>
-
-          <button
-            className="start-button"
-            onClick={() => {
-              setStarted(false);
-              setCurrentQuestion(0);
-              setAnswers({});
-              setSubmitted(false);
-            }}
-          >
+          <button className="start-button" onClick={returnToPortal}>
             Return to Portal
           </button>
         </section>
@@ -116,7 +120,7 @@ function App() {
     );
   }
 
-  if (started) {
+  if (started && question) {
     return (
       <main className="exam-app">
         <header className="exam-header">
@@ -162,7 +166,9 @@ function App() {
             <button
               className="secondary-button"
               disabled={currentQuestion === 0}
-              onClick={() => setCurrentQuestion((previous) => previous - 1)}
+              onClick={() =>
+                setCurrentQuestion((previous) => previous - 1)
+              }
             >
               ← Previous
             </button>
@@ -170,7 +176,9 @@ function App() {
             {currentQuestion < questions.length - 1 ? (
               <button
                 className="start-button"
-                onClick={() => setCurrentQuestion((previous) => previous + 1)}
+                onClick={() =>
+                  setCurrentQuestion((previous) => previous + 1)
+                }
               >
                 Next Question →
               </button>
@@ -182,7 +190,8 @@ function App() {
           </div>
 
           <p className="description">
-            {Object.keys(answers).length} of {questions.length} questions answered
+            {Object.keys(answers).length} of {questions.length} questions
+            answered
           </p>
         </section>
 
@@ -223,8 +232,14 @@ function App() {
           </div>
         </div>
 
-        <button className="start-button" onClick={handleStartExam}>
-          Start Exam →
+        {error && <p className="description">{error}</p>}
+
+        <button
+          className="start-button"
+          onClick={handleStartExam}
+          disabled={loading}
+        >
+          {loading ? 'Loading Questions...' : 'Start Exam →'}
         </button>
       </section>
 

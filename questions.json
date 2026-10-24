@@ -1,0 +1,33 @@
+
+{
+  "questions": [
+    {
+      "id": 1,
+      "question": "Which part of Electron manages the application lifecycle and native operating system APIs?",
+      "options": [
+        "React component",
+        "Main process",
+        "CSS stylesheet",
+        "HTML document"
+      ],
+      "correctAnswer": 1
+    },
+    {
+      "id": 2,
+      "question": "Which technology is used to build the user interface in this project?",
+      "options": ["React", "SQLite", "Git", "npm"],
+      "correctAnswer": 0
+    },
+    {
+      "id": 3,
+      "question": "What is the purpose of a preload script in Electron?",
+      "options": [
+        "To style buttons",
+        "To replace React",
+        "To expose selected APIs safely between processes",
+        "To install npm packages"
+      ],
+      "correctAnswer": 2
+    }
+  ]
+}
