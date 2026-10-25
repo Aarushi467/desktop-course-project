@@ -9,12 +9,12 @@ const PORT = 3000;
 const questionsPath = path.join(__dirname, 'questions.json');
 
 // Allow the React app to request data from this API.
-
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
+  // Answer the browser's preflight check directly
   if (req.method === 'OPTIONS') {
     return res.sendStatus(204);
   }
